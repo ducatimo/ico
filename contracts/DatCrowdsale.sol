@@ -6,13 +6,13 @@ import './RefundVault.sol';
 
 /**
  * @title  
- * @dev Crowdsale is a base contract for managing a token crowdsale.
- * DatumCrowdSale have a start and end date, where investors can make
+ * @dev DatCrowdSale is a contract for managing a token crowdsale.
+ * DatCrowdSale have a start and end date, where investors can make
  * token purchases and the crowdsale will assign them tokens based
- * on a token per ETH rate. Funds collected are forwarded to a wallet 
+ * on a token per ETH rate. Funds collected are forwarded to a refundable valut 
  * as they arrive.
  */
-contract DatumCrowdSale is Ownable {
+contract DatCrowdSale is Ownable {
   using SafeMath for uint256;
 
   // The token being sold
@@ -25,7 +25,7 @@ contract DatumCrowdSale is Ownable {
   // Minimum amount to participate
   uint256 public minimumParticipationAmount = 1000000000000000000 wei; //1 ether
 
-    // Minimum amount to participate
+  // Maximum amount to participate
   uint256 public maximalParticipationAmount = 1000000000000000000000 wei; //1000 ether
 
   // address where funds are collected
@@ -34,17 +34,14 @@ contract DatumCrowdSale is Ownable {
   // refund vault used to hold funds while crowdsale is running
   RefundVault public vault;
 
-  // how many token units a buyer gets per wei
-  uint256 rate = 1;
-
-  // how is the multiplyer
-  uint256 bonusRate = 1;
+  // how many token units a buyer gets per ether
+  uint256 rate = 15000;
 
   // amount of raised money in wei
   uint256 public weiRaised;
 
   // minimum amount of funds to be raised in weis
-  uint256 public goal;
+  uint256 public goal = 5000000000000000000000 wei;
 
   //flag for final of crowdsale
   bool public isFinalized = false;
@@ -62,12 +59,14 @@ contract DatumCrowdSale is Ownable {
   event TokenPurchase(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
 
 
-    /// @notice Log an event for each funding contributed during the public phase
-    /// @notice Events are not logged when the constructor is being executed during
-    ///         deployment, so the preallocations will not be logged
-    event LogParticipation(address indexed sender, uint256 value, uint256 timestamp);
+  /**
+  * @notice Log an event for each funding contributed during the public phase
+  * @notice Events are not logged when the constructor is being executed during
+  *         deployment, so the preallocations will not be logged
+  */
+  event LogParticipation(address indexed sender, uint256 value, uint256 timestamp);
 
-  function DatumCrowdSale(uint256 _goal, uint256 _startDate, uint256 _endDate, uint256 _rate, address _wallet) {
+  function DatCrowdSale(uint256 _goal, uint256 _startDate, uint256 _endDate, uint256 _rate, address _wallet) {
     token = createTokenContract();
     vault = new RefundVault(_wallet);
     goal = _goal;
@@ -78,7 +77,6 @@ contract DatumCrowdSale is Ownable {
   }
 
   // creates the token to be sold. 
-  // override this method to have crowdsale of a specific mintable token.
   function createTokenContract() internal returns (DatumGenesisToken) {
     return new DatumGenesisToken();
   }
@@ -101,7 +99,6 @@ contract DatumCrowdSale is Ownable {
 
     // update state
     weiRaised = weiRaised.add(weiAmount);
-
 
     //purchase tokens
     token.transfer(beneficiary, tokens / 10000000000000000);
@@ -139,27 +136,6 @@ contract DatumCrowdSale is Ownable {
     isFinalized = true;
   }
 
-
-  // should be called after crowdsale ends, to do
-  // some extra finalization work
-  function finalizeTestSuccess() onlyOwner {
-    
-    vault.close();
-
-    Finalized();
-    
-    isFinalized = true;
-  }
-
-   function finalizeTestRefund() onlyOwner {
-    
-    vault.enableRefunds();
-
-    Finalized();
-    
-    isFinalized = true;
-  }
-
   // vault finalization task, called when owner calls finalize()
   function finalization() internal {
     if (goalReached()) {
@@ -186,6 +162,5 @@ contract DatumCrowdSale is Ownable {
   function hasEnded() public constant returns (bool) {
     return now > endDate;
   }
-
-
 }
+
