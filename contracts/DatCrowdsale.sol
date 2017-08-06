@@ -1,6 +1,24 @@
 pragma solidity ^0.4.13;
 
-import './token/DatumGenesisToken.sol';
+/*
+    Copyright 2017
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ 
+
+import './DatumGenesisToken.sol';
 import './math/SafeMath.sol';
 import './RefundVault.sol';
 
@@ -12,7 +30,7 @@ import './RefundVault.sol';
  * on a token per ETH rate. Funds collected are forwarded to a refundable valut 
  * as they arrive.
  */
-contract DatCrowdSale is Ownable {
+contract DatCrowdSale is TokenController, Ownable {
   using SafeMath for uint256;
 
   // The token being sold
@@ -43,6 +61,9 @@ contract DatCrowdSale is Ownable {
   // minimum amount of funds to be raised in weis
   uint256 public goal = 5000000000000000000000 wei;
 
+  //the token used for this crowd sale
+  DatumGenesisToken public tokenContract;   // The new token for this Campaign
+
   //flag for final of crowdsale
   bool public isFinalized = false;
 
@@ -66,19 +87,16 @@ contract DatCrowdSale is Ownable {
   */
   event LogParticipation(address indexed sender, uint256 value, uint256 timestamp);
 
-  function DatCrowdSale(uint256 _goal, uint256 _startDate, uint256 _endDate, uint256 _rate, address _wallet) {
-    token = createTokenContract();
+
+  
+  function DatCrowdSale(uint256 _goal, uint256 _startDate, uint256 _endDate, uint256 _rate, address _tokenAddress, address _wallet) {
     vault = new RefundVault(_wallet);
     goal = _goal;
     startDate = _startDate;
     endDate = _endDate;
     rate = _rate;
+    tokenContract = DatumGenesisToken(_tokenAddress);
     wallet = _wallet;
-  }
-
-  // creates the token to be sold. 
-  function createTokenContract() internal returns (DatumGenesisToken) {
-    return new DatumGenesisToken();
   }
 
 
@@ -88,7 +106,7 @@ contract DatCrowdSale is Ownable {
   }
 
   // low level token purchase function
-  function buyTokens(address beneficiary) payable {
+  function buyTokens(address beneficiary) internal {
     require(beneficiary != 0x0);
     require(validPurchase());
 
@@ -101,7 +119,10 @@ contract DatCrowdSale is Ownable {
     weiRaised = weiRaised.add(weiAmount);
 
     //purchase tokens
-    token.transfer(beneficiary, tokens / 10000000000000000);
+    //token.transfer(beneficiary, tokens / 10000000000000000);
+    tokenContract.generateTokens(beneficiary, tokens / 10000000000000000);
+
+
     TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
     // Log an event of the participant's contribution
@@ -162,5 +183,40 @@ contract DatCrowdSale is Ownable {
   function hasEnded() public constant returns (bool) {
     return now > endDate;
   }
+
+  /////////////////
+// TokenController interface
+/////////////////
+
+/// @notice `proxyPayment()` allows the caller to send ether to the sale and
+/// have the tokens created in an address of their choosing
+/// @param _owner The address that will hold the newly created tokens
+
+    function proxyPayment(address _owner) payable returns(bool) {
+        buyTokens(_owner);
+        return true;
+    }
+
+/// @notice Notifies the controller about a transfer, for this crowdsale all
+///  transfers are allowed by default and no extra notifications are needed
+/// @param _from The origin of the transfer
+/// @param _to The destination of the transfer
+/// @param _amount The amount of the transfer
+/// @return False if the controller does not authorize the transfer
+    function onTransfer(address _from, address _to, uint _amount) returns(bool) {
+        return true;
+    }
+
+/// @notice Notifies the controller about an approval, for this crowdsale all
+///  approvals are allowed by default and no extra notifications are needed
+/// @param _owner The address that calls `approve()`
+/// @param _spender The spender in the `approve()` call
+/// @param _amount The amount in the `approve()` call
+/// @return False if the controller does not authorize the approval
+    function onApprove(address _owner, address _spender, uint _amount)
+        returns(bool)
+    {
+        return true;
+    }
 }
 
